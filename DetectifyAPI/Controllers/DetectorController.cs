@@ -6,6 +6,8 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Net.NetworkInformation;
+using System.Net;
+using DnsClient;
 
 namespace DetectifyAPI.Controllers
 {
@@ -27,43 +29,58 @@ namespace DetectifyAPI.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> IndexAsync(List<string> domains)
+        public async Task<IActionResult> Domains(List<string> domains)
         {
-            JsonResult result = new JsonResult("test");
+            List<Domain> filledDomains = new List<Domain>();
 
             foreach (var domain in domains)
             {
+
                 using var client = new HttpClient();
                 Ping ping = new Ping();
-
-                string domainToCheck = "http://www.sl.se";
-
-                Uri uri = new Uri(domainToCheck);
-                string uriHost = uri.Host;
-                string fullusiHost = uri.AbsoluteUri;
+                Uri uri;
+                string uriHost = string.Empty, fullUriHost = string.Empty;
+                Domain filledDomain = new Domain();
 
                 try
                 {
-                    var clientResult = await client.GetAsync(domainToCheck);
+                    UriBuilder urlb = new UriBuilder("http", domain);
+                    uriHost = urlb.Uri.Host;
+                    fullUriHost = urlb.Uri.AbsoluteUri;
+                }
+                catch (Exception ex)
+                {
+                    // We ignore malformed domains...
+                }
+
+                try
+                {
+                    var lookup = new LookupClient();
+                    var result = await lookup.QueryAsync("google.com", QueryType.A);
+
+                    var record = result.Answers.ARecords().FirstOrDefault();
+                    var ip = record?.Address;
+
+                    var clientResult = await client.GetAsync(fullUriHost);
                     string server = clientResult.Headers.GetValues("Server").First();
 
                     if (IsNginx(server))
                     {
                         PingReply reply = ping.Send(uriHost);
-                        string address = reply.Address.ToString();
+                        filledDomain.address = domain;
+                        filledDomain.IP = reply.Address.ToString();
+                        filledDomains.Add(filledDomain);
                     }
                 }
                 catch (Exception ex)
                 {
                     // We let it pass for now...
-                    throw;
-                }  
-
-
+                    //throw;
+                }
             }
 
-            return Ok("test");
-      
+            return Ok(filledDomains);
+
         }
 
         private bool IsNginx(string server)
