@@ -1,8 +1,18 @@
-﻿namespace DetectifyAPI.Controllers
+﻿using System.Collections.Generic;
+using System.Text.Json.Serialization;
+
+namespace DetectifyAPI.Controllers
 {
     internal class Domain
     {
-        public string address { get; internal set; }
-        public string IP { get; internal set; }
+        [JsonPropertyName("name")]
+        public string Address { get; internal set; }
+        [JsonPropertyName("ip_address")]
+        public List<string> IP { get; internal set; }
+
+        public Domain()
+        {
+            IP = new List<string>();
+        }
     }
 }
