@@ -56,6 +56,19 @@ namespace DetectifyAPITests
 
             var res = detectorController.Domains(domains);
             var objectResult = (OkObjectResult)(res.Result);
+            var list = (List<string>)objectResult.Value;
+
+            Assert.AreNotEqual(res.Result, null);
+            Assert.GreaterOrEqual(list.Count, 1);
+        }
+
+        [Test]
+        public void TestArrayWithIps()
+        {
+            var domains = new List<string>(new string[] { "www.google.com", "www.detectify.com", "www.sl.se", "wordpress.org", "nginx.com" });
+         
+            var res = detectorController.DomainsWithIP(domains);
+            var objectResult = (OkObjectResult)(res.Result);
             var dic = (Dictionary<string, List<string>>)objectResult.Value;
 
             Assert.AreNotEqual(res.Result, null);

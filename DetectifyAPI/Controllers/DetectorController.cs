@@ -66,7 +66,6 @@ namespace DetectifyAPI.Controllers
             await domains.ParallelForEachAsync(async domain =>
             {                
                 string uriHost = string.Empty, fullUriHost = string.Empty;
-                Domain filledDomain = new Domain();
 
                 UriBuilder urlb = new UriBuilder("http", domain);
                 uriHost = urlb.Uri.Host;
@@ -91,13 +90,13 @@ namespace DetectifyAPI.Controllers
                                 var lookup = new LookupClient();
                                 var result = await lookup.QueryAsync(domain, QueryType.A);
 
-                                filledDomain.Address = domain;
+                                List<string> listOfIps = new List<string>();
                                 foreach (var arecord in result.Answers.ARecords())
                                 {
-                                    filledDomain.IP.Add(arecord.Address.ToString());
+                                    listOfIps.Add(arecord.Address.ToString());
                                 }
 
-                                filledDomainsDictionary.TryAdd(filledDomain.Address, filledDomain.IP);
+                                filledDomainsDictionary.TryAdd(domain, listOfIps);
                             }
                             else
                             {
