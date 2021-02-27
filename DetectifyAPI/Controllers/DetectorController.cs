@@ -52,31 +52,35 @@ namespace DetectifyAPI.Controllers
 
         private async Task<List<string>> CheckDomains(List<string> domains, ConcurrentDictionary<string, List<string>> filledDomainsDictionary, bool withIps)
         {
-            HttpClientHandler httpClientHandler = new HttpClientHandler();
-            httpClientHandler.CheckCertificateRevocationList = false;
-            httpClientHandler.AllowAutoRedirect = false;
             //https://docs.microsoft.com/en-us/dotnet/api/system.net.security.remotecertificatevalidationcallback
             ServicePointManager.ServerCertificateValidationCallback += (sender, cert, chain, sslPolicyErrors) => { return true; };
-            _httpClient = new HttpClient(httpClientHandler);
-            _httpClient.Timeout = new TimeSpan(0, 0, 10);
+            HttpClientHandler httpClientHandler = new HttpClientHandler
+            {
+                CheckCertificateRevocationList = false,
+                AllowAutoRedirect = false
+            };
+            _httpClient = new HttpClient(httpClientHandler)
+            {
+                Timeout = new TimeSpan(0, 0, 10)
+            };
             List<string> domainsWithoutIps = new List<string>();
 
             // With async parallel on net core gets more tricky:
             // https://timdeschryver.dev/blog/process-your-list-in-parallel-to-make-it-faster-in-dotnet
             await domains.ParallelForEachAsync(async domain =>
             {                
-                string uriHost = string.Empty, fullUriHost = string.Empty;
+                string uriHost = string.Empty, fullUriHost = string.Empty;              
 
-                UriBuilder urlb = new UriBuilder("http", domain);
-                uriHost = urlb.Uri.Host;
-                fullUriHost = urlb.Uri.AbsoluteUri;
-
-                if (!Uri.IsWellFormedUriString(fullUriHost, UriKind.Absolute))
+                if (!Uri.IsWellFormedUriString(domain, UriKind.Absolute))
                 {
                     _logger.LogError($"{domain} - URL format is not ok");
                 }
                 else
                 {
+                    UriBuilder urlb = new UriBuilder("http", domain);
+                    uriHost = urlb.Uri.Host;
+                    fullUriHost = urlb.Uri.AbsoluteUri;
+
                     try
                     {
                         // Cut connection once responce header is read, we want it NOW

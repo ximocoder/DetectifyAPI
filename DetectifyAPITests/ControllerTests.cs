@@ -13,7 +13,7 @@ namespace DetectifyAPITests
     public class ControllerTests
     {
         private DetectorController detectorController;
-        private Mock<ILogger<DetectorController>> logger = new Mock<ILogger<DetectorController>>();
+        private readonly Mock<ILogger<DetectorController>> logger = new Mock<ILogger<DetectorController>>();
 
         [SetUp]
         public void Setup()
@@ -86,9 +86,9 @@ namespace DetectifyAPITests
             var dic = (Dictionary<string, List<string>>)objectResult.Value;
 
             Assert.AreNotEqual(res.Result, null);
+            Assert.Greater(dic.Count, 100);
         }
 
-        //[Test, Ignore("long execution time")]
         [Test]
         public void TestAlexaTop100()
         {
@@ -100,6 +100,20 @@ namespace DetectifyAPITests
             var dic = (Dictionary<string, List<string>>)objectResult.Value;
 
             Assert.AreNotEqual(res.Result, null);
+            Assert.Greater(dic.Count, 10);
+        }
+
+        [Test]
+        public void TestIncorrectHostNameWithIp()
+        {
+            var domains = new List<string>(new string[] { "www.detectifyyyyyy" });
+
+            var res = detectorController.DomainsWithIP(domains);
+            var objectResult = (OkObjectResult)(res.Result);
+            var dic = (Dictionary<string, List<string>>)objectResult.Value;
+
+            Assert.AreNotEqual(res.Result, null);
+            Assert.AreEqual(dic.Count, 0);
         }
 
         [Test]
@@ -107,9 +121,26 @@ namespace DetectifyAPITests
         {
             var domains = new List<string>(new string[] { "www.detectifyyyyyy" });
 
-            var res = detectorController.DomainsWithIP(domains);
+            var res = detectorController.Domains(domains);
+            var objectResult = (OkObjectResult)(res.Result);
+            var list = (List<string>)objectResult.Value;
 
             Assert.AreNotEqual(res.Result, null);
+            Assert.AreEqual(list.Count, 0);
+        }
+
+
+        [Test]
+        public void WrongInput()
+        {
+            var domains = new List<string>(new string[] { "ewrje`rh98274253 32i5i235j432ñ5,mqç+435" });
+
+            var res = detectorController.Domains(domains);
+            var objectResult = (OkObjectResult)(res.Result);
+            var list = (List<string>)objectResult.Value;
+
+            Assert.AreNotEqual(res.Result, null);
+            Assert.AreEqual(list.Count, 0);
         }
     }
 }
