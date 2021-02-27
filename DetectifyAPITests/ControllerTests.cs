@@ -24,17 +24,34 @@ namespace DetectifyAPITests
         [Test]
         public void TestOne()
         {
-            var domains = new List<string>(new string[] { "www.detectify.com" });
+            // ["example.com","blog.detectify.com"]
+            var domains = new List<string>(new string[] { "example.com", "www.detectify.com" });
 
             var res = detectorController.Domains(domains);
+            var objectResult = (OkObjectResult)(res.Result);
+            var list = (List<string>)objectResult.Value;
 
             Assert.AreNotEqual(res.Result, null);
+            Assert.GreaterOrEqual(list.Count, 1);
+        }
+
+        [Test]
+        public void TestOneWithIp()
+        {
+            // ["example.com","blog.detectify.com"]
+            var domains = new List<string>(new string[] { "example.com", "www.detectify.com" });
+
+            var res = detectorController.DomainsWithIP(domains);
+            var objectResult = (OkObjectResult)(res.Result);
+            var dic = (Dictionary<string, List<string>>)objectResult.Value;
+
+            Assert.AreNotEqual(res.Result, null);
+            Assert.GreaterOrEqual(dic["www.detectify.com"].Count, 1);
         }
 
         [Test]
         public void TestArray()
         {
-
             var domains = new List<string>(new string[] { "www.google.com", "www.detectify.com", "www.sl.se", "wordpress.org", "nginx.com" });
 
             var res = detectorController.Domains(domains);
@@ -45,26 +62,27 @@ namespace DetectifyAPITests
             Assert.GreaterOrEqual(dic["www.detectify.com"].Count, 1);
         }
 
-        [Test, Ignore("long execution time")]
+        [Test]
         public void TestAlexaTop1k()
         {
             var myJsonString = File.ReadAllText("AlexaTop1k.json");
             var hostsList = JsonConvert.DeserializeObject<List<string>>(myJsonString);
 
-            var res = detectorController.Domains(hostsList);
+            var res = detectorController.DomainsWithIP(hostsList);
             var objectResult = (OkObjectResult)(res.Result);
             var dic = (Dictionary<string, List<string>>)objectResult.Value;
 
             Assert.AreNotEqual(res.Result, null);
         }
 
-        [Test, Ignore("long execution time")]
+        //[Test, Ignore("long execution time")]
+        [Test]
         public void TestAlexaTop100()
         {
             var myJsonString = File.ReadAllText("AlexaTop1k.json");
             var hostsList = JsonConvert.DeserializeObject<List<string>>(myJsonString);
 
-            var res = detectorController.Domains(hostsList.GetRange(0, 100));
+            var res = detectorController.DomainsWithIP(hostsList.GetRange(0, 100));
             var objectResult = (OkObjectResult)(res.Result);
             var dic = (Dictionary<string, List<string>>)objectResult.Value;
 
@@ -76,7 +94,7 @@ namespace DetectifyAPITests
         {
             var domains = new List<string>(new string[] { "www.detectifyyyyyy" });
 
-            var res = detectorController.Domains(domains);
+            var res = detectorController.DomainsWithIP(domains);
 
             Assert.AreNotEqual(res.Result, null);
         }

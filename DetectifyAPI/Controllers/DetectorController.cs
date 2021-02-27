@@ -7,6 +7,8 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using DnsClient;
 using System.Collections.Concurrent;
+using System.Threading.Tasks.Dataflow;
+using System.Net;
 
 namespace DetectifyAPI.Controllers
 {
@@ -15,6 +17,9 @@ namespace DetectifyAPI.Controllers
     public class DetectorController : ControllerBase
     {
         private readonly ILogger<DetectorController> _logger;
+        private static ConcurrentDictionary<string, List<string>> _filledDomainsDictionary;
+        private static HttpClient _httpClient;
+
 
         public DetectorController(ILogger<DetectorController> logger)
         {
@@ -25,100 +30,118 @@ namespace DetectifyAPI.Controllers
         [Route("[action]")]
         public async Task<IActionResult> Domains(List<string> domains)
         {
-            List<Domain> filledDomains = new List<Domain>();
+            _filledDomainsDictionary = new ConcurrentDictionary<string, List<string>>();
 
-            await CheckDomains(domains, filledDomains);
+            var domainsWithNginx = await CheckDomains(domains, _filledDomainsDictionary, false);
 
+            return Ok(domainsWithNginx);
+        }
 
-            ConcurrentDictionary<string,List<string>> dict = new ConcurrentDictionary<string, List<string>>();
+        [HttpPost]
+        [Route("[action]")]
+        public async Task<IActionResult> DomainsWithIP(List<string> domains)
+        {
+            _filledDomainsDictionary = new ConcurrentDictionary<string, List<string>>();
 
-
-            Parallel.ForEach(filledDomains, (currentDomain) =>
-            {
-                dict.TryAdd(currentDomain.Address, currentDomain.IP);
-            });
-
-            var ndic = dict.ToDictionary(e => e.Key, e => e.Value);
+            await CheckDomains(domains, _filledDomainsDictionary, true);
+            var ndic = _filledDomainsDictionary.ToDictionary(e => e.Key, e => e.Value);
 
             return Ok(ndic);
 
         }
 
-        [HttpPost]
-        [Route("[action]")]
-        public async Task<IActionResult> DomainsWithIP(string domainsWithIP)
+        private async Task<List<string>> CheckDomains(List<string> domains, ConcurrentDictionary<string, List<string>> filledDomainsDictionary, bool withIps)
         {
-            List<Domain> filledDomains = new List<Domain>();
+            HttpClientHandler httpClientHandler = new HttpClientHandler();
+            httpClientHandler.CheckCertificateRevocationList = false;
+            httpClientHandler.AllowAutoRedirect = false;
+            //https://docs.microsoft.com/en-us/dotnet/api/system.net.security.remotecertificatevalidationcallback
+            ServicePointManager.ServerCertificateValidationCallback += (sender, cert, chain, sslPolicyErrors) => { return true; };
+            _httpClient = new HttpClient(httpClientHandler);
+            _httpClient.Timeout = new TimeSpan(0, 0, 10);
+            List<string> domainsWithoutIps = new List<string>();
 
-            //await CheckDomains(domains, filledDomains);
-
-
-            //Dictionary<string, List<string>> dict = new Dictionary<string, List<string>>();
-
-
-            //Parallel.ForEach(filledDomains, (currentDomain) =>
-            //{
-            //    dict.Add(currentDomain.Address, currentDomain.IP);
-            //});
-
-
-            return Ok("test");
-
-        }
-
-        private async Task CheckDomains(List<string> domains, List<Domain> filledDomains)
-        {
-            foreach (var domain in domains)
-            {
-
-                using var client = new HttpClient();
-                client.Timeout = new TimeSpan(0, 0, 5);
+            // With async parallel on net core gets more tricky:
+            // https://timdeschryver.dev/blog/process-your-list-in-parallel-to-make-it-faster-in-dotnet
+            await domains.ParallelForEachAsync(async domain =>
+            {                
                 string uriHost = string.Empty, fullUriHost = string.Empty;
                 Domain filledDomain = new Domain();
 
-                try
-                {
-                    UriBuilder urlb = new UriBuilder("http", domain);
-                    uriHost = urlb.Uri.Host;
-                    fullUriHost = urlb.Uri.AbsoluteUri;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"{domain} does not have a correct Uri format: {ex.Message}");
-                    // We ignore malformed domains...
-                }
+                UriBuilder urlb = new UriBuilder("http", domain);
+                uriHost = urlb.Uri.Host;
+                fullUriHost = urlb.Uri.AbsoluteUri;
 
-                try
+                if (!Uri.IsWellFormedUriString(fullUriHost, UriKind.Absolute))
                 {
-                    var clientResult = await client.GetAsync(fullUriHost);
-                    string server = clientResult.Headers.GetValues("Server").First();
-
-                    if (IsNginx(server))
+                    _logger.LogError($"{domain} - URL format is not ok");
+                }
+                else
+                {
+                    try
                     {
-                        var lookup = new LookupClient();
-                        var result = await lookup.QueryAsync(domain, QueryType.A);
+                        // Cut connection once responce header is read, we want it NOW
+                        var clientResult = await _httpClient.GetAsync(fullUriHost, HttpCompletionOption.ResponseHeadersRead);
+                        string server = clientResult.Headers.GetValues("Server").First();
 
-                        filledDomain.Address = domain;
-                        foreach (var arecord in result.Answers.ARecords())
+                        if (IsNginx(server))
                         {
-                            filledDomain.IP.Add(arecord.Address.ToString());
-                        }
+                            if (withIps)
+                            {
+                                var lookup = new LookupClient();
+                                var result = await lookup.QueryAsync(domain, QueryType.A);
 
-                        filledDomains.Add(filledDomain);
+                                filledDomain.Address = domain;
+                                foreach (var arecord in result.Answers.ARecords())
+                                {
+                                    filledDomain.IP.Add(arecord.Address.ToString());
+                                }
+
+                                filledDomainsDictionary.TryAdd(filledDomain.Address, filledDomain.IP);
+                            }
+                            else
+                            {
+                                domainsWithoutIps.Add(domain);
+                            }                            
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // We let it pass for now...
+                        _logger.LogError($"{domain} - some problem getting the server and IP: {ex.Message}");
                     }
                 }
-                catch (Exception ex)
-                {
-                    // We let it pass for now...
-                    _logger.LogError($"{domain} - some problem getting the server or IP: {ex.Message}");
-                }
-            }
+            },
+            Convert.ToInt32(Math.Ceiling((Environment.ProcessorCount * 0.75) * 2.0)));
+
+            return domainsWithoutIps;
         }
 
         private static bool IsNginx(string server)
         {
             return server.ToUpper().Contains("NGINX");
         }
+    }
 
+    public static class AsyncExtensions
+    {
+        public static Task ParallelForEachAsync<T>(this IEnumerable<T> source, Func<T, Task> body, int maxDop = DataflowBlockOptions.Unbounded, TaskScheduler scheduler = null)
+        {
+            var options = new ExecutionDataflowBlockOptions
+            {
+                MaxDegreeOfParallelism = maxDop
+            };
+            if (scheduler != null)
+                options.TaskScheduler = scheduler;
+
+            var block = new ActionBlock<T>(body, options);
+
+            foreach (var item in source)
+                block.Post(item);
+
+            block.Complete();
+            return block.Completion;
+
+        }
     }
 }
