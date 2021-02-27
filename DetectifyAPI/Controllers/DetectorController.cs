@@ -18,7 +18,7 @@ namespace DetectifyAPI.Controllers
     {
         private readonly ILogger<DetectorController> _logger;
         private static ConcurrentDictionary<string, List<string>> _filledDomainsDictionary;
-        private static HttpClient _httpClient;
+        //private static HttpClient _httpClient;
 
 
         public DetectorController(ILogger<DetectorController> logger)
@@ -59,6 +59,7 @@ namespace DetectifyAPI.Controllers
                 CheckCertificateRevocationList = false,
                 AllowAutoRedirect = false
             };
+            HttpClient _httpClient;
             _httpClient = new HttpClient(httpClientHandler)
             {
                 Timeout = new TimeSpan(0, 0, 10)
@@ -69,9 +70,9 @@ namespace DetectifyAPI.Controllers
             // https://timdeschryver.dev/blog/process-your-list-in-parallel-to-make-it-faster-in-dotnet
             await domains.ParallelForEachAsync(async domain =>
             {                
-                string uriHost = string.Empty, fullUriHost = string.Empty;              
+                string uriHost = string.Empty, fullUriHost = string.Empty;
 
-                if (!Uri.IsWellFormedUriString(domain, UriKind.Absolute))
+                if (!Uri.IsWellFormedUriString(domain, UriKind.RelativeOrAbsolute))
                 {
                     _logger.LogError($"{domain} - URL format is not ok");
                 }

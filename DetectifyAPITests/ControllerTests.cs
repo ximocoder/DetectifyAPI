@@ -133,7 +133,7 @@ namespace DetectifyAPITests
         [Test]
         public void WrongInput()
         {
-            var domains = new List<string>(new string[] { "ewrje`rh98274253 32i5i235j432ñ5,mqç+435" });
+            var domains = new List<string>(new string[] { "ewrje`rh98274253 32i5i235j432ï¿½5,mqï¿½+435" });
 
             var res = detectorController.Domains(domains);
             var objectResult = (OkObjectResult)(res.Result);
