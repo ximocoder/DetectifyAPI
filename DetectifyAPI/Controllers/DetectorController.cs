@@ -5,9 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using System.Net.NetworkInformation;
-using System.Net;
 using DnsClient;
+using System.Collections.Concurrent;
 
 namespace DetectifyAPI.Controllers
 {
@@ -31,16 +30,17 @@ namespace DetectifyAPI.Controllers
             await CheckDomains(domains, filledDomains);
 
 
-            Dictionary<string,List<string>> dict = new Dictionary<string, List<string>>();
+            ConcurrentDictionary<string,List<string>> dict = new ConcurrentDictionary<string, List<string>>();
 
 
             Parallel.ForEach(filledDomains, (currentDomain) =>
             {
-                dict.Add(currentDomain.Address, currentDomain.IP);
+                dict.TryAdd(currentDomain.Address, currentDomain.IP);
             });
 
+            var ndic = dict.ToDictionary(e => e.Key, e => e.Value);
 
-            return Ok(dict);
+            return Ok(ndic);
 
         }
 

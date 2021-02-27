@@ -17,4 +17,10 @@
     <ProjectReference Include="..\DetectifyAPI\DetectifyAPI.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="AlexaTop1k.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
