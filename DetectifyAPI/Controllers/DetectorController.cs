@@ -52,22 +52,11 @@ namespace DetectifyAPI.Controllers
 
         private async Task<List<string>> CheckDomains(List<string> domains, ConcurrentDictionary<string, List<string>> filledDomainsDictionary, bool withIps)
         {
-            //https://docs.microsoft.com/en-us/dotnet/api/system.net.security.remotecertificatevalidationcallback
-            System.Net.Security.RemoteCertificateValidationCallback p = (sender, cert, chain, sslPolicyErrors) => true;
-            ServicePointManager.ServerCertificateValidationCallback += p;
-            ServicePointManager.SecurityProtocol |=  SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
-            var httpClientHandler = new HttpClientHandler
-            {
-                CheckCertificateRevocationList = false,
-                AllowAutoRedirect = false
-            };
-            var _httpClient = new HttpClient(httpClientHandler)
-            {
-                Timeout = new TimeSpan(0, 0, 10)
-            };
+            var _httpClient = SetUpHttpClient();
+
             var domainsWithoutIps = new List<string>();
 
-            // With async parallel on net core gets more tricky:
+            // With async: parallel on net core gets more tricky, more info in the link
             // https://timdeschryver.dev/blog/process-your-list-in-parallel-to-make-it-faster-in-dotnet
             await domains.ParallelForEachAsync(async domain =>
             {
@@ -83,40 +72,64 @@ namespace DetectifyAPI.Controllers
 
                     try
                     {
-                        // Cut connection once responce header is read, we want it NOW
-                        var clientResult = await _httpClient.GetAsync(fullUriHost, HttpCompletionOption.ResponseHeadersRead);
-                        var server = clientResult.Headers.GetValues("Server").First();
-
-                        if (IsNginx(server))
-                        {
-                            if (withIps)
-                            {
-                                var lookup = new LookupClient();
-                                var result = await lookup.QueryAsync(domain, QueryType.A);
-
-                                var listOfIps = new List<string>();
-                                foreach (var arecord in result.Answers.ARecords())
-                                {
-                                    listOfIps.Add(arecord.Address.ToString());
-                                }
-
-                                filledDomainsDictionary.TryAdd(domain, listOfIps);
-                            }
-                            else
-                            {
-                                domainsWithoutIps.Add(domain);
-                            }
-                        }
+                        await GetDomainInfo(filledDomainsDictionary, withIps, domain, _httpClient, domainsWithoutIps, fullUriHost);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError($"{domain} - some problem getting the server and IP: {ex.Message}");
+                        _logger.LogError($"{domain} - some problem getting the server and IP for domain {domain}: {ex.Message}");
                     }
                 }
             },
             Convert.ToInt32(Math.Ceiling(Environment.ProcessorCount * 0.75 * 2.0)));
 
             return domainsWithoutIps;
+        }
+
+        private static HttpClient SetUpHttpClient()
+        {
+            // Even with cert errors we go all in
+            //https://docs.microsoft.com/en-us/dotnet/api/system.net.security.remotecertificatevalidationcallback
+            System.Net.Security.RemoteCertificateValidationCallback p = (sender, cert, chain, sslPolicyErrors) => true;
+            ServicePointManager.ServerCertificateValidationCallback += p;
+            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
+            var httpClientHandler = new HttpClientHandler
+            {
+                CheckCertificateRevocationList = false,
+                AllowAutoRedirect = false
+            };
+            var _httpClient = new HttpClient(httpClientHandler)
+            {
+                Timeout = new TimeSpan(0, 0, 10)
+            };
+            return _httpClient;
+        }
+
+        private static async Task GetDomainInfo(ConcurrentDictionary<string, List<string>> filledDomainsDictionary, bool withIps, string domain, HttpClient _httpClient, List<string> domainsWithoutIps, string fullUriHost)
+        {
+            // Cut connection once response header is read, we want it NOW
+            var clientResult = await _httpClient.GetAsync(fullUriHost, HttpCompletionOption.ResponseHeadersRead);
+            var server = clientResult.Headers.GetValues("Server").First();
+
+            if (IsNginx(server))
+            {
+                if (withIps)
+                {
+                    var lookup = new LookupClient();
+                    var result = await lookup.QueryAsync(domain, QueryType.A);
+
+                    var listOfIps = new List<string>();
+                    foreach (var arecord in result.Answers.ARecords())
+                    {
+                        listOfIps.Add(arecord.Address.ToString());
+                    }
+
+                    filledDomainsDictionary.TryAdd(domain, listOfIps);
+                }
+                else
+                {
+                    domainsWithoutIps.Add(domain);
+                }
+            }
         }
 
         private static bool IsNginx(string server)
