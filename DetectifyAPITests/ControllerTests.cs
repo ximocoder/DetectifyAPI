@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using Moq;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Mvc;
-using System.Threading.Tasks;
 using System.IO;
 using Newtonsoft.Json;
 
@@ -12,13 +11,13 @@ namespace DetectifyAPITests
 {
     public class ControllerTests
     {
-        private DetectorController detectorController;
-        private readonly Mock<ILogger<DetectorController>> logger = new Mock<ILogger<DetectorController>>();
+        private DetectorController _detectorController;
+        private readonly Mock<ILogger<DetectorController>> _logger = new Mock<ILogger<DetectorController>>();
 
         [SetUp]
         public void Setup()
         {
-            detectorController = new DetectorController(logger.Object);
+            _detectorController = new DetectorController(_logger.Object);
         }
 
         [Test]
@@ -27,8 +26,8 @@ namespace DetectifyAPITests
             // ["example.com","blog.detectify.com"]
             var domains = new List<string>(new string[] { "example.com", "www.detectify.com" });
 
-            var res = detectorController.Domains(domains);
-            var objectResult = (OkObjectResult)(res.Result);
+            var res = _detectorController.Domains(domains);
+            var objectResult = (OkObjectResult)res.Result;
             var list = (List<string>)objectResult.Value;
 
             Assert.AreNotEqual(res.Result, null);
@@ -41,8 +40,8 @@ namespace DetectifyAPITests
             // ["example.com","blog.detectify.com"]
             var domains = new List<string>(new string[] { "example.com", "www.detectify.com" });
 
-            var res = detectorController.DomainsWithIP(domains);
-            var objectResult = (OkObjectResult)(res.Result);
+            var res = _detectorController.DomainsWithIp(domains);
+            var objectResult = (OkObjectResult)res.Result;
             var dic = (Dictionary<string, List<string>>)objectResult.Value;
 
             Assert.AreNotEqual(res.Result, null);
@@ -54,8 +53,8 @@ namespace DetectifyAPITests
         {
             var domains = new List<string>(new string[] { "www.google.com", "www.detectify.com", "www.sl.se", "wordpress.org", "nginx.com" });
 
-            var res = detectorController.Domains(domains);
-            var objectResult = (OkObjectResult)(res.Result);
+            var res = _detectorController.Domains(domains);
+            var objectResult = (OkObjectResult)res.Result;
             var list = (List<string>)objectResult.Value;
 
             Assert.AreNotEqual(res.Result, null);
@@ -67,8 +66,8 @@ namespace DetectifyAPITests
         {
             var domains = new List<string>(new string[] { "www.google.com", "www.detectify.com", "www.sl.se", "wordpress.org", "nginx.com" });
          
-            var res = detectorController.DomainsWithIP(domains);
-            var objectResult = (OkObjectResult)(res.Result);
+            var res = _detectorController.DomainsWithIp(domains);
+            var objectResult = (OkObjectResult)res.Result;
             var dic = (Dictionary<string, List<string>>)objectResult.Value;
 
             Assert.AreNotEqual(res.Result, null);
@@ -81,9 +80,11 @@ namespace DetectifyAPITests
             var myJsonString = File.ReadAllText("AlexaTop1k.json");
             var hostsList = JsonConvert.DeserializeObject<List<string>>(myJsonString);
 
-            var res = detectorController.DomainsWithIP(hostsList);
-            var objectResult = (OkObjectResult)(res.Result);
+            var res = _detectorController.DomainsWithIp(hostsList);
+            var objectResult = (OkObjectResult)res.Result;
             var dic = (Dictionary<string, List<string>>)objectResult.Value;
+
+            TestContext.Out.WriteLine($"Number of hosts with nginx: {dic.Count}");
 
             Assert.AreNotEqual(res.Result, null);
             Assert.Greater(dic.Count, 100);
@@ -95,9 +96,11 @@ namespace DetectifyAPITests
             var myJsonString = File.ReadAllText("AlexaTop1k.json");
             var hostsList = JsonConvert.DeserializeObject<List<string>>(myJsonString);
 
-            var res = detectorController.DomainsWithIP(hostsList.GetRange(0, 100));
-            var objectResult = (OkObjectResult)(res.Result);
+            var res = _detectorController.DomainsWithIp(hostsList.GetRange(0, 100));
+            var objectResult = (OkObjectResult)res.Result;
             var dic = (Dictionary<string, List<string>>)objectResult.Value;
+
+            TestContext.Out.WriteLine($"Number of hosts with nginx: {dic.Count}");
 
             Assert.AreNotEqual(res.Result, null);
             Assert.Greater(dic.Count, 10);
@@ -108,8 +111,8 @@ namespace DetectifyAPITests
         {
             var domains = new List<string>(new string[] { "www.detectifyyyyyy" });
 
-            var res = detectorController.DomainsWithIP(domains);
-            var objectResult = (OkObjectResult)(res.Result);
+            var res = _detectorController.DomainsWithIp(domains);
+            var objectResult = (OkObjectResult)res.Result;
             var dic = (Dictionary<string, List<string>>)objectResult.Value;
 
             Assert.AreNotEqual(res.Result, null);
@@ -121,8 +124,8 @@ namespace DetectifyAPITests
         {
             var domains = new List<string>(new string[] { "www.detectifyyyyyy" });
 
-            var res = detectorController.Domains(domains);
-            var objectResult = (OkObjectResult)(res.Result);
+            var res = _detectorController.Domains(domains);
+            var objectResult = (OkObjectResult)res.Result;
             var list = (List<string>)objectResult.Value;
 
             Assert.AreNotEqual(res.Result, null);
@@ -135,8 +138,8 @@ namespace DetectifyAPITests
         {
             var domains = new List<string>(new string[] { "ewrje`rh98274253 32i5i235j432�5,mq�+435" });
 
-            var res = detectorController.Domains(domains);
-            var objectResult = (OkObjectResult)(res.Result);
+            var res = _detectorController.Domains(domains);
+            var objectResult = (OkObjectResult)res.Result;
             var list = (List<string>)objectResult.Value;
 
             Assert.AreNotEqual(res.Result, null);

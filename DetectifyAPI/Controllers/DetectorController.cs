@@ -39,7 +39,7 @@ namespace DetectifyAPI.Controllers
 
         [HttpPost]
         [Route("[action]")]
-        public async Task<IActionResult> DomainsWithIP(List<string> domains)
+        public async Task<IActionResult> DomainsWithIp(List<string> domains)
         {
             _filledDomainsDictionary = new ConcurrentDictionary<string, List<string>>();
 
@@ -53,40 +53,39 @@ namespace DetectifyAPI.Controllers
         private async Task<List<string>> CheckDomains(List<string> domains, ConcurrentDictionary<string, List<string>> filledDomainsDictionary, bool withIps)
         {
             //https://docs.microsoft.com/en-us/dotnet/api/system.net.security.remotecertificatevalidationcallback
-            ServicePointManager.ServerCertificateValidationCallback += (sender, cert, chain, sslPolicyErrors) => { return true; };
-            HttpClientHandler httpClientHandler = new HttpClientHandler
+            System.Net.Security.RemoteCertificateValidationCallback p = (sender, cert, chain, sslPolicyErrors) => true;
+            ServicePointManager.ServerCertificateValidationCallback += p;
+            ServicePointManager.SecurityProtocol |=  SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
+            var httpClientHandler = new HttpClientHandler
             {
                 CheckCertificateRevocationList = false,
                 AllowAutoRedirect = false
             };
-            HttpClient _httpClient;
-            _httpClient = new HttpClient(httpClientHandler)
+            var _httpClient = new HttpClient(httpClientHandler)
             {
                 Timeout = new TimeSpan(0, 0, 10)
             };
-            List<string> domainsWithoutIps = new List<string>();
+            var domainsWithoutIps = new List<string>();
 
             // With async parallel on net core gets more tricky:
             // https://timdeschryver.dev/blog/process-your-list-in-parallel-to-make-it-faster-in-dotnet
             await domains.ParallelForEachAsync(async domain =>
-            {                
-                string uriHost = string.Empty, fullUriHost = string.Empty;
-
+            {
                 if (!Uri.IsWellFormedUriString(domain, UriKind.RelativeOrAbsolute))
                 {
                     _logger.LogError($"{domain} - URL format is not ok");
                 }
                 else
                 {
-                    UriBuilder urlb = new UriBuilder("http", domain);
-                    uriHost = urlb.Uri.Host;
+                    var urlb = new UriBuilder("http", domain);
+                    var fullUriHost = string.Empty;
                     fullUriHost = urlb.Uri.AbsoluteUri;
 
                     try
                     {
                         // Cut connection once responce header is read, we want it NOW
                         var clientResult = await _httpClient.GetAsync(fullUriHost, HttpCompletionOption.ResponseHeadersRead);
-                        string server = clientResult.Headers.GetValues("Server").First();
+                        var server = clientResult.Headers.GetValues("Server").First();
 
                         if (IsNginx(server))
                         {
@@ -95,7 +94,7 @@ namespace DetectifyAPI.Controllers
                                 var lookup = new LookupClient();
                                 var result = await lookup.QueryAsync(domain, QueryType.A);
 
-                                List<string> listOfIps = new List<string>();
+                                var listOfIps = new List<string>();
                                 foreach (var arecord in result.Answers.ARecords())
                                 {
                                     listOfIps.Add(arecord.Address.ToString());
@@ -106,17 +105,16 @@ namespace DetectifyAPI.Controllers
                             else
                             {
                                 domainsWithoutIps.Add(domain);
-                            }                            
+                            }
                         }
                     }
                     catch (Exception ex)
                     {
-                        // We let it pass for now...
                         _logger.LogError($"{domain} - some problem getting the server and IP: {ex.Message}");
                     }
                 }
             },
-            Convert.ToInt32(Math.Ceiling((Environment.ProcessorCount * 0.75) * 2.0)));
+            Convert.ToInt32(Math.Ceiling(Environment.ProcessorCount * 0.75 * 2.0)));
 
             return domainsWithoutIps;
         }
