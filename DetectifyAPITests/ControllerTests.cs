@@ -1,3 +1,4 @@
+using System;
 using NUnit.Framework;
 using DetectifyAPI.Controllers;
 using System.Collections.Generic;
@@ -85,6 +86,7 @@ namespace DetectifyAPITests
             var dic = (Dictionary<string, List<string>>)objectResult.Value;
 
             TestContext.Out.WriteLine($"Number of hosts with nginx: {dic.Count}");
+            Console.WriteLine($"Number of hosts with nginx from top 1k: {dic.Count}");
 
             Assert.AreNotEqual(res.Result, null);
             Assert.Greater(dic.Count, 100);
@@ -101,6 +103,7 @@ namespace DetectifyAPITests
             var dic = (Dictionary<string, List<string>>)objectResult.Value;
 
             TestContext.Out.WriteLine($"Number of hosts with nginx: {dic.Count}");
+            Console.WriteLine($"Number of hosts with nginx from top 100: {dic.Count}");
 
             Assert.AreNotEqual(res.Result, null);
             Assert.Greater(dic.Count, 10);
