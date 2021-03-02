@@ -18,8 +18,6 @@ namespace DetectifyAPI.Controllers
     {
         private readonly ILogger<DetectorController> _logger;
         private static ConcurrentDictionary<string, List<string>> _filledDomainsDictionary;
-        //private static HttpClient _httpClient;
-
 
         public DetectorController(ILogger<DetectorController> logger)
         {

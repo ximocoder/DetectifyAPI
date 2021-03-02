@@ -33,9 +33,10 @@ namespace DetectifyAPI
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
-                app.UseSwagger();
-                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "DetectifyAPI v1"));
             }
+
+            app.UseSwagger();
+            app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "DetectifyAPI v1"));
 
             app.UseHttpsRedirection();
 
@@ -47,6 +48,7 @@ namespace DetectifyAPI
             {
                 endpoints.MapControllers();
             });
+            
         }
     }
 }
